@@ -1,0 +1,636 @@
+365760 disk_readblock: block 3
+249 write lock on: 4
+
+@@@ #365761 disk_readblock: block 4
+253 read unlock on: 2
+280 read unlock on: 4
+FS_WRITEBLOCK
+
+@@@ #365762 close 6
+New connection 7
+decryped size: '27'
+563 read lock on: 0
+
+@@@ #365763 disk_readblock: block 0
+
+@@@ #365764 disk_readblock: block 1
+dir
+581 write lock on: 2
+
+@@@ #365765 disk_readblock: block 2
+593 read unlock on: 0
+New connection 5
+
+@@@ #365766 disk_readblock: block 3
+652 write lock on: 4
+
+@@@ #365767 disk_readblock: block 4
+
+@@@ #365768 disk_writeblock: block 2
+700 write unlock on: 4
+702 write unlock on: 2
+FS_DELETE
+decryped size: '547'
+
+@@@ #365769 send 7 3
+@@@ #365770 32
+
+@@@ #365771 disk_readblock: block 0
+
+@@@ #365772 disk_readblock: block 1
+
+@@@ #365773 disk_readblock: block 2
+FS_WRITEBLOCK
+
+@@@ #365774 close 5
+
+@@@ #365775 send 7 32
+@@@ #365776 ~`[??,c?2g2?
+                        ]0?:
+                            ?d ?? ڊJK	
+
+@@@ #365777 close 7
+New connection 6
+New connection 5
+decryped size: '22'
+decryped size: '547'
+559 write lock on: 0
+
+@@@ #365778 disk_readblock: block 0
+
+@@@ #365779 disk_readblock: block 1
+
+@@@ #365780 disk_readblock: block 2
+FS_WRITEBLOCK
+
+@@@ #365781 close 6
+
+@@@ #365782 disk_readblock: block 0
+
+@@@ #365783 disk_readblock: block 1
+652 write lock on: 2
+
+@@@ #365784 disk_readblock: block 2
+
+@@@ #365785 disk_writeblock: block 0
+700 write unlock on: 2
+702 write unlock on: 0
+FS_DELETE
+
+@@@ #365786 send 5 3
+@@@ #365787 32
+New connection 7
+
+@@@ #365788 send 5 32
+@@@ #365789 ~`[??,c?2g2?
+                        ]0S?*???S?j?Ј??
+
+@@@ #365790 close 5
+decryped size: '547'
+
+@@@ #365791 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365792 close 7
+New connection 6
+decryped size: '547'
+
+@@@ #365793 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365794 close 6
+New connection 5
+decryped size: '548'
+
+@@@ #365795 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365796 close 5
+New connection 6
+decryped size: '548'
+
+@@@ #365797 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365798 close 6
+New connection 5
+decryped size: '548'
+
+@@@ #365799 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365800 close 5
+New connection 6
+decryped size: '548'
+
+@@@ #365801 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365802 close 6
+New connection 5
+decryped size: '548'
+
+@@@ #365803 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365804 close 5
+New connection 6
+decryped size: '548'
+
+@@@ #365805 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365806 close 6
+New connection 5
+decryped size: '548'
+
+@@@ #365807 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365808 close 5
+New connection 6
+decryped size: '548'
+
+@@@ #365809 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365810 close 6
+New connection 5
+decryped size: '549'
+
+@@@ #365811 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365812 close 5
+New connection 6
+decryped size: '549'
+
+@@@ #365813 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365814 close 6
+New connection 5
+decryped size: '549'
+
+@@@ #365815 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365816 close 5
+New connection 6
+decryped size: '549'
+
+@@@ #365817 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365818 close 6
+New connection 5
+decryped size: '15'
+return_msg: 3047 0
+FS_SESSION
+New connection 6
+
+@@@ #365819 send 5 3
+@@@ #365820 32
+
+@@@ #365821 send 5 32
+@@@ #365822 ~`[??,c?2g2?
+                        ]0????????/㇇
+
+@@@ #365823 close 5
+decryped size: '549'
+
+@@@ #365824 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365825 close 6
+New connection 7
+decryped size: '24'
+205 write lock on: 0
+New connection 5
+decryped size: '549'
+
+@@@ #365826 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365827 close 5
+
+@@@ #365828 disk_readblock: block 0
+351 write lock on: 2
+
+@@@ #365829 disk_writeblock: block 2
+
+@@@ #365830 disk_writeblock: block 1
+
+@@@ #365831 disk_writeblock: block 0
+521 write unlock on: 2
+523 write unlock on: 0
+New connection 6
+return_msg: 3047 1
+FS_CREATE
+
+@@@ #365832 send 7 3
+@@@ #365833 32
+
+@@@ #365834 send 7 32
+@@@ #365835 ~`[??,c?2g2?
+                        ]0?֓_??O1!?P<???
+
+@@@ #365836 close 7
+decryped size: '549'
+
+@@@ #365837 disk_readblock: block 0
+
+@@@ #365838New connection 5
+decryped size: '29'
+210 read lock on: 0
+ disk_readblock: block 1
+
+@@@ #365839 disk_readblock: block 2
+FS_WRITEBLOCK
+
+@@@ #365840 close 6
+
+@@@ #365841 disk_readblock: block 0
+
+@@@ #365842 disk_readblock: block 1
+dir
+227 write lock on: 2
+
+@@@ #365843 disk_readblock: block 2
+249 read unlock on: 0
+351 write lock on: 4
+
+@@@ #365844 disk_writeblock: block 4
+
+@@@ #365845 disk_writeblock: block 3
+
+@@@ #365846 disk_writeblock: block 2
+521 write unlock on: 4
+523 write unlock on: 2
+return_msg: 3047 2
+FS_CREATE
+New connection 7
+
+@@@ #365847 send 5 3
+@@@ #365848 32
+decryped size: '549'
+
+@@@ #365849 send 5 32
+@@@ #365850 ~`[??,c?2g2?
+                        ]0?1??e??? ?9????
+
+@@@ #365851 close 5
+
+@@@ #365852 disk_readblock: block 0
+
+@@@ #365853 disk_readblock: block 1
+
+@@@ #365854 disk_readblock: block 2
+
+@@@ #365855 disk_readblock: block 3
+249 write lock on: 4
+
+@@@ #365856 disk_readblock: block 4
+253 read unlock on: 2
+280 read unlock on: 4
+FS_WRITEBLOCK
+
+@@@ #365857 close 7
+New connection 6
+decryped size: '545'
+
+@@@ #365858 disk_readblock: block 0
+
+@@@ #365859 disk_readblock: block 1
+
+@@@ #365860 disk_readblock: block 2
+
+@@@ #365861 disk_readblock: block 3
+249 write lock on: 4
+
+@@@ #365862 disk_readblock: block 4
+253 read unlock on: New connection 5
+2
+
+@@@ #365863 disk_writeblock: block 5
+
+@@@ #365864 disk_writeblock: block 4
+305 write unlock on: 4
+FS_WRITEBLOCK
+
+@@@ #365865 send 6 3
+@@@ #365866 32
+
+@@@ #365867 send 6 32
+@@@ #365868 ~`[??,c?2g2?
+                        ]0r?]5?k?Ok<#?e
+
+@@@ #365869 close 6
+decryped size: '549'
+
+@@@ #365870 disk_readblock: block 0
+
+@@@ #365871 disk_readblock: block 1
+
+@@@ #365872 disk_readblock: block New connection 7
+decryped size: '32'
+58 read lock on: 0
+2
+
+@@@ #365873 disk_readblock: block 3
+249 write lock on: 4
+
+@@@ #365874 disk_readblock: block 4
+253 read unlock on: 2
+280 read unlock on: 4
+FS_WRITEBLOCK
+
+@@@ #365875 close 5
+
+@@@ #365876 disk_readblock: block 0
+
+@@@ #365877 disk_readblock: block 1
+74 read lock on: 2
+
+@@@ #365878 disk_readblock: block 2
+78 read unlock on: 0
+
+@@@ #365879 disk_readblock: block 3
+128 write lock on: 4
+
+@@@ #365880 disk_readblock: block 4
+132 read unlock on: 2
+
+@@@ #365881 disk_readblock: block 5
+151 read unlock on: 4
+FS_READBLOCK
+New connection 6
+
+@@@ #365882 send 7 4
+@@@ #365883 544
+
+@@@ #365884 send 7 544
+@@@ #365885 ???#g?-?-??jը??msg?L?}?]&?>c&?~g&???F\???}??[?rDи??u?l??S????C?ʵ8hf?ɍi$i??Z???6??&?qv|E<*?????%[?e?eY
+???՚????U?Y??P?/&G???9??oQ07Ѽ?w??L?^%@?\G???C?k~ޤ?)?i{??}N?M??ڡ??????p??E?`??
+                                                                             ??k? 9?
+                                                                                    ?*M#,`F7?艛??K??Ğvr??s?d?8?O(?)Löb?j
+?<!???fw????"B????f?Ƞ???x???c?D??f??N?=??gqI?dWn???hx$b<<b??F?ɩ??MC?3y?i???G?=?29n?f<???(?i|??ܼ
+                                                                                              N?
+?+??]??Ʊ??[1?{?	#??r???рr'?+eZ[S/????A???I???ߪ? d???O??\,?????o???қ?'U????5?\?]?? vᶲ?S?*#Q??V?3??v+8޷?Bv9? 3??޺??
+?
+ ?:?z'?F??u~??%Lo?2
+
+@@@ #365886 close 7
+decryped size: '549'
+
+@@@ #365887 disk_readblock: block 0
+
+@@@ #365888 disk_readblock: block 1
+
+@@@ #365889 disk_readblock: block 2
+
+@@@ #365890 disk_readblock: block 3
+249 write lock on: 4
+
+@@@ #365891 disk_readblock: block 4
+253 read unlock on: 2
+280 read unlock on: 4
+FS_WRITEBLOCK
+
+@@@ #365892 close 6
+New connection 5
+decryped size: '27'
+563 read lock on: 0
+
+@@@ #365893 disk_readblock: block 0
+
+@@@ #365894 disk_readblock: block 1
+dir
+581 write lock on: 2
+
+@@@ #365895 disk_readblock: block 2
+593 read unlock on: 0
+
+@@@ #365896 disk_readblock: block 3
+652 write lock on: New connection 6
+4
+
+@@@ #365897 disk_readblock: block 4
+
+@@@ #365898 disk_writeblock: block 2
+700 write unlock on: 4
+702 write unlock on: 2
+FS_DELETE
+decryped size: '549'
+
+@@@ #365899 send 5 3
+@@@ #365900 32
+
+@@@ #365901 send 5 32
+@@@ #365902 ~`[??,c?2g2?
+                        ]0f?B??0?B"???
+
+@@@ #365903 close 5
+
+@@@ #365904 disk_readblock: block 0
+
+@@@ #365905 disk_readblock: block 1
+
+@@@ #365906 disk_readblock: block 2
+FS_WRITEBLOCK
+
+@@@ #365907 close 6
+New connection 7
+decryped size: '22'
+559 write lock on: 0
+
+@@@ #365908 disk_readblock: block 0
+
+@@@ #365909 disk_readblock: block 1
+652 write lock on: 2
+
+@@@ #365910 disk_readblock: block 2
+
+@@@ #365911 disk_writeblock: block 0
+700 write unlock on: 2
+702 write unlock on: 0New connection 5
+
+FS_DELETE
+
+@@@ #365912 send 7 3
+@@@ #365913 32
+
+@@@ #365914 send 7 32
+@@@ #365915 ~`[??,c?2g2?
+                        ]0?Nܳ??????ɴ>
+
+@@@ #365916 close 7
+decryped size: '549'
+
+@@@ #365917 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365918 close 5
+New connection 6
+decryped size: '549'
+
+@@@ #365919 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365920 close 6
+New connection 5
+decryped size: '549'
+
+@@@ #365921 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365922 close 5
+New connection 6
+decryped size: '549'
+
+@@@ #365923 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365924 close 6
+New connection 5
+decryped size: '549'
+
+@@@ #365925 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365926 close 5
+New connection 6
+decryped size: '549'
+
+@@@ #365927 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365928 close 6
+New connection 5
+decryped size: '549'
+
+@@@ #365929 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365930 close 5
+New connection 6
+decryped size: '549'
+
+@@@ #365931 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365932 close 6
+New connection 5
+decryped size: '549'
+
+@@@ #365933 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365934 close 5
+New connection 6
+decryped size: '549'
+
+@@@ #365935 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365936 close 6
+New connection 5
+decryped size: '549'
+
+@@@ #365937 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365938 close 5
+New connection 6
+decryped size: '549'
+
+@@@ #365939 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365940 close 6
+New connection 5
+decryped size: '549'
+
+@@@ #365941 disk_readblock: block 0
+FS_WRITEBLOCK
+
+@@@ #365942 close 5
+New connection 6
+decryped size: '549'
+FS_WRITEBLOCK
+
+@@@ #365943 close 6
+New connection 5
+New connection 6
+decryped size: '15'
+return_msg: 3048 0
+FS_SESSION
+
+@@@ #365944 send 6 3
+@@@ #365945 32
+
+@@@ #365946 send 6 32
+@@@ #365947 ~`[??,c?2g2?
+                        ]0E???
+                              P??m)D??
+
+@@@ #365948 close 6
+New connection 7
+decryped size: '24'
+205 write lock on: 0
+
+@@@ #365949 disk_readblock: block 0
+351 write lock on: 2
+
+@@@ #365950 disk_writeblock: block 2
+
+@@@ #365951 disk_writeblock: block 1
+
+@@@ #365952 disk_writeblock: block 0
+521 write unlock on: 2
+523 write unlock on: 0
+return_msg: 3048 1
+FS_CREATE
+
+@@@ #365953 send 7 3
+@@@ #365954 32
+
+@@@ #365955 send 7 32
+@@@ #365956 ~`[??,c?2g2?
+                        ]0?t?S?0e(b??
+                                     ?m
+
+@@@ #365957 close 7
+New connection 6
+decryped size: '29'
+210 read lock on: 0
+
+@@@ #365958 disk_readblock: block 0
+
+@@@ #365959 disk_readblock: block 1
+dir
+227 write lock on: 2
+
+@@@ #365960 disk_readblock: block 2
+249 read unlock on: 0
+351 write lock on: 4
+
+@@@ #365961 disk_writeblock: block 4
+
+@@@ #365962 disk_writeblock: block 3
+
+@@@ #365963 disk_writeblock: block 2
+521 write unlock on: 4
+523 write unlock on: 2
+return_msg: 3048 2
+FS_CREATE
+
+@@@ #365964 send 6 3
+@@@ #365965 32
+
+@@@ #365966 send 6 32
+@@@ #365967 ~`[??,c?2g2?
+                        ]0X?H??N?c?i$U???
+
+@@@ #365968 close 6
+Segmentation fault (core dumped)

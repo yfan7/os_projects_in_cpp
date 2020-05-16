@@ -1,0 +1,1176 @@
+#include "fs_handlers.h"
+#include "fs_server.h"
+#include "globals.h"
+#include <string>
+#include <algorithm>
+#include <iostream>
+#include <limits.h>
+
+int session_handler(char* username, char* message, char* &return_msg) {
+    if(max_sessions) {
+        return -1;
+    }
+    char* tokens[3];
+    if(!tokenize_message(message, tokens, 3)) return -1;
+    session_lock.lock();
+    unsigned int cur_session = global_session++;
+    max_sessions = (global_session == 0);
+    session_lock.unlock();
+
+
+    unsigned long sequence;
+
+    try
+    {
+        size_t t1;
+        sequence = std::stoul(tokens[2], &t1, 10);
+        if (tokens[2][t1] != '\0') {
+        return -1;
+        }
+    }
+    catch(...)
+    {
+        return -1;
+    }
+    if(sequence > UINT_MAX) return -1;
+
+
+    session_lock.lock();
+    session_map[cur_session] = std::make_pair(std::string(username), (unsigned int)sequence);
+    session_lock.unlock();
+
+    // char session_char = '0' + cur_session;
+
+    std::string str_session = std::to_string(cur_session);
+    std::string str_sequence = std::to_string((unsigned int)sequence);
+
+    return_msg = (char*) malloc(str_session.length() + str_sequence.length() + 2);
+    strcpy(return_msg, str_session.c_str());
+    return_msg[str_session.length()] = ' ';
+    strcpy(return_msg + str_session.length() + 1, str_sequence.c_str());
+    return_msg[str_session.length() + 1 + str_sequence.length()] = '\0';
+    //printf("test: %s\n", str_session.c_str());
+
+    return str_session.length() + 2 + str_sequence.length();
+}
+
+
+int readblock_handler(char* username, char* message, char* &return_msg) {
+    char* tokens[5];
+    //printf("messge: %s\n", message);
+    if (!tokenize_message(message, tokens, 5)) return -1;
+
+    try {
+        if (std::stoi(tokens[4]) >= (int)FS_MAXFILEBLOCKS || std::stoi(tokens[4]) < 0) return -1;
+    }
+    catch(...) {
+        return -1;
+    }
+
+    if (!session_checker(username, tokens[1], tokens[2])) return -1;
+
+    size_t t1, t2;
+    unsigned int session = (unsigned int)std::stoul(tokens[1], &t1, 10);
+    unsigned int sequence = (unsigned int)std::stoul(tokens[2], &t2, 10);
+    if (tokens[1][t1] != '\0' || tokens[2][t2] != '\0' ) {
+        return -1;
+    }
+    
+
+    std::string pathname = tokens[3];
+    if (pathname.length() > FS_MAXPATHNAME) return -1;
+
+    session_lock.lock();
+    session_map[session].second = sequence;
+    session_lock.unlock();
+
+    if (!is_pathname_valid(pathname)) return -1;
+    unsigned int block = 0;
+    try{
+        size_t  temp;
+        block = std::stoi(tokens[4],&temp, 10);
+        if (tokens[4][temp] != '\0') {
+            return -1;
+        }
+    }
+    catch(...) {
+        return -1;
+    }
+    std::vector<int> indices;
+    file_splitter(pathname, indices);
+
+    fs_inode cur_inode;
+    int cur_inode_block = 0;
+    cout_lock.lock();
+    std::cout << "59 read lock on: " << cur_inode_block << "\n";
+    cout_lock.unlock();
+    mutex_map[cur_inode_block].lock_shared();
+    // cout_lock.lock();
+    // std::cout << "59 done " << cur_inode_block << "\n";
+    // cout_lock.unlock();
+
+    disk_readblock(cur_inode_block, (void*)&cur_inode);
+    unsigned int level = 1;
+    while (level < indices.size()) {
+        bool found = false;
+        
+        for (unsigned int i = 0; i < cur_inode.size; ++i) {
+            fs_direntry direntries[FS_DIRENTRIES];
+            disk_readblock(cur_inode.blocks[i], (void*)&direntries);
+
+
+            for (unsigned int j = 0; j < FS_DIRENTRIES; j++) {
+                // std::cout << pathname.substr(indices[level -1 ] + 1, indices[level]-(indices[level - 1] + 1)) << "\n";
+                if (direntries[j].inode_block != 0 && std::string(direntries[j].name) == pathname.substr(indices[level - 1] + 1, indices[level] - (indices[level - 1] + 1))) {
+                    cout_lock.lock();
+                    std::cout << "74 read lock on: " << direntries[j].inode_block << std::endl;
+                    cout_lock.unlock();                    
+                    mutex_map[direntries[j].inode_block].lock_shared();
+                    // cout_lock.lock();
+                    // std::cout << "74 done " << direntries[j].inode_block << std::endl;
+                    // cout_lock.unlock(); 
+                    disk_readblock(direntries[j].inode_block, (void*)&cur_inode);
+
+                    cout_lock.lock();
+                    std::cout << "78 read unlock on: " << cur_inode_block << std::endl;
+                    cout_lock.unlock();
+                    mutex_map[cur_inode_block].unlock_shared();
+
+                    cur_inode_block = direntries[j].inode_block;
+
+                    if(strcmp(cur_inode.owner, username) != 0 || cur_inode.type == 'f') {
+                        cout_lock.lock();
+                        std::cout << "83 read unlock on: " << cur_inode_block << std::endl;
+                        cout_lock.unlock();
+                        
+                        mutex_map[cur_inode_block].unlock_shared();
+
+                        
+                        return -1;
+                    }
+
+                    ++level;
+                    found = true;
+                    break;
+                }
+            }
+            if (found) break;
+
+        }
+        if (!found) {
+            cout_lock.lock();
+            std::cout << "96 read unlock on: " << cur_inode_block << std::endl;
+            cout_lock.unlock();
+            
+            mutex_map[cur_inode_block].unlock_shared();
+            
+            return -1;
+        }
+    }
+    
+    fs_direntry direntries[FS_DIRENTRIES];
+    bool found = false;
+    for (unsigned int i = 0; i < cur_inode.size; ++i) {
+        disk_readblock(cur_inode.blocks[i], (void*)&direntries);
+
+        for (unsigned int j = 0; j < FS_DIRENTRIES; j++) {
+
+            // std::cout << pathname.substr(indices[level-1]+1) << "\n";
+            if (direntries[j].inode_block != 0 && std::string(direntries[j].name) == pathname.substr(indices[level-1]+1)){
+                cout_lock.lock();                                
+                std::cout << "128 write lock on: " << direntries[j].inode_block << std::endl;
+                cout_lock.unlock();
+                mutex_map[direntries[j].inode_block].lock_shared();
+                // cout_lock.lock();                                
+                // std::cout << "128 done: " << direntries[j].inode_block << std::endl;
+                // cout_lock.unlock();
+                disk_readblock(direntries[j].inode_block, (void*)&cur_inode);
+                cout_lock.lock();
+                std::cout << "132 read unlock on: " << cur_inode_block << std::endl;
+                cout_lock.unlock();
+                mutex_map[cur_inode_block].unlock_shared();
+
+                cur_inode_block = direntries[j].inode_block;
+
+                //printf("type: %c\n", cur_inode.type);
+                //printf("username: %s\n", cur_inode.owner);
+                if (strcmp(cur_inode.owner, username) != 0 || cur_inode.type == 'd') {
+                    cout_lock.lock();
+                    std::cout << "123 read unlock on: " << cur_inode_block << std::endl;
+                    cout_lock.unlock();
+                    mutex_map[cur_inode_block].unlock_shared();
+                    
+                    return -1;
+                }
+
+                found = true;
+                break;
+            }
+        }
+        if(found) break;
+    }
+
+    char buff[FS_BLOCKSIZE];
+    if(!found) {
+        cout_lock.lock();
+        std::cout << "138 read unlock on: " << cur_inode_block << std::endl;  
+        cout_lock.unlock();
+        mutex_map[cur_inode_block].unlock_shared();
+        return -1;
+    }
+    
+    if(block >= cur_inode.size) {
+        cout_lock.lock();
+        std::cout << "144 read unlock on: " << cur_inode_block << std::endl;  
+        cout_lock.unlock();
+        mutex_map[cur_inode_block].unlock_shared();
+        return -1;
+    }       
+
+    disk_readblock(cur_inode.blocks[block], (void*)buff);
+    cout_lock.lock();
+    std::cout << "151 read unlock on: " << cur_inode_block << std::endl; 
+    cout_lock.unlock();
+    mutex_map[cur_inode_block].unlock_shared();
+
+    
+    return_msg = (char*) malloc(strlen(tokens[1]) + strlen(tokens[2]) + 2 + FS_BLOCKSIZE);
+    strcpy(return_msg, tokens[1]);
+    return_msg[strlen(tokens[1])] = ' ';
+    strcpy(return_msg + strlen(tokens[1]) + 1, tokens[2]);
+    return_msg[strlen(tokens[1]) + 1 + strlen(tokens[2])] = '\0';
+    strncpy(return_msg + strlen(tokens[1]) + 2 + strlen(tokens[2]), buff, FS_BLOCKSIZE);
+
+    // for (unsigned int i = strlen(tokens[1]) + 2 + strlen(tokens[2]); i < strlen(tokens[1]) + 2 + strlen(tokens[2]) + FS_BLOCKSIZE; ++i) {
+    //     printf("%c", return_msg[i]);
+    // }
+
+    return strlen(tokens[1]) + 2 + strlen(tokens[2]) + FS_BLOCKSIZE;
+
+}
+
+
+int writeblock_handler(char* username, char* message, int size, char* &return_msg) {
+    char* tokens[6];
+    //printf("messge: %s\n", message);
+    if (!tokenize_message(message, tokens, 5)) return -1;
+    tokens[5] = tokens[4]+strlen(tokens[4])+1;
+    try {
+        if (size - (tokens[5] - message) != FS_BLOCKSIZE || std::stoi(tokens[4]) >= (int)FS_MAXFILEBLOCKS || std::stoi(tokens[4]) < 0) return -1;
+    }
+    catch(...) {
+        return -1;
+    }
+    if (!session_checker(username, tokens[1], tokens[2])) return -1;
+
+    size_t t1, t2;
+    unsigned int session = (unsigned int)std::stoul(tokens[1], &t1, 10);
+    unsigned int sequence = (unsigned int)std::stoul(tokens[2], &t2, 10);
+    if (tokens[1][t1] != '\0' || tokens[2][t2] != '\0' ) {
+        return -1;
+    }
+
+    std::string pathname = tokens[3];
+    if (pathname.length() > FS_MAXPATHNAME) return -1;
+
+    session_lock.lock();
+    session_map[session].second = sequence;
+    session_lock.unlock();
+
+    if (!is_pathname_valid(pathname)) return -1;
+
+    std::vector<int> indices;
+    file_splitter(pathname, indices);
+    size_t temp;
+    unsigned int block = 0;
+    try{
+        block = std::stoi(tokens[4], &temp, 10);
+        if (tokens[4][temp] != '\0') {
+            return -1;
+        }
+    }
+    catch(...) {
+
+        return -1;
+    }
+
+    fs_inode cur_inode;
+    int cur_inode_block = 0;
+    // std::cout << "75 read lock on: " << cur_inode_block << "\n";
+    mutex_map[cur_inode_block].lock_shared();
+
+    disk_readblock(cur_inode_block, (void*)&cur_inode);
+    unsigned int level = 1;
+    while (level < indices.size()) {
+        bool found = false;
+        
+        for (unsigned int i = 0; i < cur_inode.size; ++i) {
+            fs_direntry direntries[FS_DIRENTRIES];
+            disk_readblock(cur_inode.blocks[i], (void*)&direntries);
+
+
+            for (unsigned int j = 0; j < FS_DIRENTRIES; j++) {
+                // std::cout << pathname.substr(indices[level -1 ] + 1, indices[level]-(indices[level - 1] + 1)) << "\n";
+                if (direntries[j].inode_block != 0 && std::string(direntries[j].name) == pathname.substr(indices[level - 1] + 1, indices[level] - (indices[level - 1] + 1))) {
+                    cout_lock.lock();
+                    std::cout << "243 read lock on: " << direntries[j].inode_block << std::endl;
+                    cout_lock.unlock();
+                    mutex_map[direntries[j].inode_block].lock_shared();
+                    disk_readblock(direntries[j].inode_block, (void*)&cur_inode);
+                    
+                    cout_lock.lock();
+                    std::cout << "249 read unlock on: " << cur_inode_block << std::endl;
+                    cout_lock.unlock();
+                    mutex_map[cur_inode_block].unlock_shared();
+
+                    cur_inode_block = direntries[j].inode_block;
+
+                    if(strcmp(cur_inode.owner, username) != 0 || cur_inode.type == 'f') {
+                        cout_lock.lock();
+                        std::cout << "256 read unlock on: " << cur_inode_block << std::endl;
+                        cout_lock.unlock();
+                        mutex_map[cur_inode_block].unlock_shared();
+                        
+                        return -1;
+                    }
+
+                    ++level;
+                    found = true;
+                    break;
+                }
+            }
+            if (found) break;
+
+        }
+        if (!found) {
+            cout_lock.lock();
+            std::cout << "273 read unlock on: " << cur_inode_block << std::endl;
+            cout_lock.unlock();
+            mutex_map[cur_inode_block].unlock_shared();
+            
+            return -1;
+        }
+    }
+    
+    fs_direntry direntries[FS_DIRENTRIES];
+    bool found = false;
+    for (unsigned int i = 0; i < cur_inode.size; ++i) {
+        disk_readblock(cur_inode.blocks[i], (void*)&direntries);
+
+        for (unsigned int j = 0; j < FS_DIRENTRIES; j++) {
+
+            // std::cout << pathname.substr(indices[level-1]+1) << "\n";
+            if (direntries[j].inode_block != 0 && std::string(direntries[j].name) == pathname.substr(indices[level-1]+1)){
+                cout_lock.lock();
+                std::cout << "291 write lock on: " << direntries[j].inode_block << std::endl;
+                cout_lock.unlock();
+                mutex_map[direntries[j].inode_block].lock();
+                
+                disk_readblock(direntries[j].inode_block, (void*)&cur_inode);
+                cout_lock.lock();
+                std::cout << "297 read unlock on: " << cur_inode_block << std::endl;
+                cout_lock.unlock();
+                mutex_map[cur_inode_block].unlock_shared();
+
+                cur_inode_block = direntries[j].inode_block;
+
+                //printf("type: %c\n", cur_inode.type);
+                //printf("username: %s\n", cur_inode.owner);
+                if (strcmp(cur_inode.owner, username) != 0 || cur_inode.type == 'd') {
+                    cout_lock.lock();
+                    std::cout << "307 read unlock on: " << cur_inode_block << std::endl;
+                    cout_lock.unlock();
+                    mutex_map[cur_inode_block].unlock();
+                    
+                    return -1;
+                }
+
+                found = true;
+                break;
+            }
+        }
+        if (found) break;
+
+    }
+
+    if(!found) {
+        cout_lock.lock();
+        std::cout << "324 read unlock on: " << cur_inode_block << std::endl;
+        cout_lock.unlock();
+        mutex_map[cur_inode_block].unlock_shared();
+        return -1;
+    }
+    
+
+    if(block > cur_inode.size) {
+        cout_lock.lock();        
+        std::cout << "333 read unlock on: " << cur_inode_block << std::endl;  
+        cout_lock.unlock();
+        mutex_map[cur_inode_block].unlock();
+        return -1;
+    }       
+    
+    if (block == cur_inode.size){
+        int file_block = get_empty_block();
+        if (file_block == -1) {
+            cout_lock.lock();
+            std::cout << "343 read unlock on: " << cur_inode_block << std::endl;
+            cout_lock.unlock(); 
+            mutex_map[cur_inode_block].unlock();
+
+            return -1;
+        }         
+        
+        cur_inode.blocks[block] = file_block;
+        ++cur_inode.size;
+        
+        disk_writeblock(cur_inode.blocks[block], (void*)tokens[5]);
+        disk_writeblock(cur_inode_block, (void*)&cur_inode);
+    }
+    else {
+        disk_writeblock(cur_inode.blocks[block], (void*)tokens[5]);
+    }
+
+    cout_lock.lock();
+    std::cout << "361 write unlock on: " << cur_inode_block << std::endl;
+    cout_lock.unlock();  
+    mutex_map[cur_inode_block].unlock();
+
+    
+    return_msg = (char*) malloc(strlen(tokens[1]) + strlen(tokens[2]) + 2);
+    strcpy(return_msg, tokens[1]);
+    return_msg[strlen(tokens[1])] = ' ';
+    strcpy(return_msg + strlen(tokens[1]) + 1, tokens[2]);
+    return_msg[strlen(tokens[1]) + 1 + strlen(tokens[2])] = '\0';
+    return strlen(tokens[1]) + 2 + strlen(tokens[2]);
+
+}
+
+
+int create_handler(char* username, char* message, char* &return_msg) {
+    char* tokens[5];
+  
+    if (!tokenize_message(message, tokens, 5)) return -1;
+
+    if (!session_checker(username, tokens[1], tokens[2])) return -1;
+
+    size_t t1, t2;
+    unsigned int session = (unsigned int)std::stoul(tokens[1], &t1, 10);
+    unsigned int sequence = (unsigned int)std::stoul(tokens[2], &t2, 10);
+    if (tokens[1][t1] != '\0' || tokens[2][t2] != '\0' ) {
+        return -1;
+    }
+
+    if (*tokens[4] != 'f' && *tokens[4] != 'd') return -1;
+
+    
+    std::string pathname = tokens[3];
+    if (pathname.length() > FS_MAXPATHNAME) return -1;
+
+    session_lock.lock();
+    session_map[session].second = sequence;
+    session_lock.unlock();
+
+    if (!is_pathname_valid(pathname)) return -1;
+
+    std::vector<int> indices;
+    file_splitter(pathname, indices);
+
+    if (pathname.substr(indices[indices.size() - 1] + 1).length() > FS_MAXFILENAME) return -1;
+    
+
+    int new_inode_block = -1;
+    new_inode_block = get_empty_block();
+    if(new_inode_block == -1) {        
+        return -1;
+    }
+    
+
+
+    fs_inode cur_inode;
+    int cur_inode_block = 0;
+    if (indices.size() == 1) {
+        cout_lock.lock();
+        std::cout << "415 write lock on: " << cur_inode_block << "\n";
+        cout_lock.unlock();
+        mutex_map[cur_inode_block].lock();
+    }
+    else {
+        cout_lock.lock();
+        std::cout << "421 read lock on: " << cur_inode_block << "\n";
+        cout_lock.unlock();
+        mutex_map[cur_inode_block].lock_shared();
+
+    }
+
+    cout_lock.lock();
+    std::cout << "407 write lock on: " << new_inode_block << std::endl;
+    cout_lock.unlock();
+    mutex_map[new_inode_block].lock();
+    disk_readblock(cur_inode_block, (void*)&cur_inode);
+    unsigned int level = 1;
+    while (level < indices.size()) {
+        bool found = false;
+        
+        for (unsigned int i = 0; i < cur_inode.size; ++i) {
+            fs_direntry direntries[FS_DIRENTRIES];
+            disk_readblock(cur_inode.blocks[i], (void*)&direntries);
+
+
+            for (unsigned int j = 0; j < FS_DIRENTRIES; j++) {
+                cout_lock.lock();
+                std::cout << pathname.substr(indices[level - 1] + 1, indices[level]-(indices[level - 1] + 1)) << "\n";
+                cout_lock.unlock();
+                if (direntries[j].inode_block != 0 && std::string(direntries[j].name) == pathname.substr(indices[level - 1] + 1, indices[level] - (indices[level - 1] + 1))) {
+                    if(level == indices.size() - 1) {
+                        cout_lock.lock();
+                        std::cout << "441 write lock on: " << direntries[j].inode_block << std::endl;
+                        cout_lock.unlock();
+                        mutex_map[direntries[j].inode_block].lock();
+
+                    }
+                    else {
+                        cout_lock.lock();
+                        std::cout << "448 read lock on: " << direntries[j].inode_block << std::endl;
+                        cout_lock.unlock();
+                        mutex_map[direntries[j].inode_block].lock_shared();
+                    }
+
+               
+                    
+                    disk_readblock(direntries[j].inode_block, (void*)&cur_inode);
+                    cout_lock.lock();
+                    std::cout << "457 read unlock on: " << cur_inode_block << std::endl; 
+                    cout_lock.unlock();                    
+                    mutex_map[cur_inode_block].unlock_shared();
+
+                    cur_inode_block = direntries[j].inode_block;
+
+                     if(strcmp(cur_inode.owner, username) != 0 || cur_inode.type == 'f') {
+                        if(level == indices.size() - 1) {
+                            cout_lock.lock();
+                            std::cout << "464 write unlock on: " << cur_inode_block << std::endl;
+                            cout_lock.unlock();
+                            mutex_map[cur_inode_block].unlock();
+                        }
+                        else {
+                            cout_lock.lock();
+                            std::cout << "469 read unlock on: " << cur_inode_block << std::endl;
+                            cout_lock.unlock();
+                            mutex_map[cur_inode_block].unlock_shared();
+                        }
+                        
+                        used_blocks_lock.lock();
+                        used_blocks[new_inode_block] = false;
+                        used_blocks_lock.unlock();
+                        mutex_map[new_inode_block].unlock();
+                        return -1;
+                    }
+
+                    ++level;
+                    found = true;
+                    break;
+                }
+            }
+            if (found) break;
+
+        }
+        if (!found) {
+            cout_lock.lock();
+            std::cout << "490 read unlock on: " << cur_inode_block << std::endl;
+            cout_lock.unlock();
+            mutex_map[cur_inode_block].unlock_shared();
+            
+            used_blocks_lock.lock();
+            used_blocks[new_inode_block] = false;
+            used_blocks_lock.unlock();
+
+            mutex_map[new_inode_block].unlock();
+            return -1;
+        }
+    }
+
+    cout_lock.lock();
+    std::cerr << "\n--Creating: " << pathname.substr(indices[level-1]+1) << "\n";
+    cout_lock.unlock();
+
+
+    fs_direntry direntries[FS_DIRENTRIES];
+    fs_direntry temp_direntries[FS_DIRENTRIES];
+    int empty_direntry = -1;
+    int direntry_block = -1;
+    for (unsigned int i = 0; i < cur_inode.size; ++i) {
+        fs_direntry* direntries_read;
+        if(direntry_block == -1) {
+            disk_readblock(cur_inode.blocks[i], (void*)&direntries);
+            direntries_read = direntries;
+        }
+        else {
+            disk_readblock(cur_inode.blocks[i], (void*)&temp_direntries);
+            direntries_read = temp_direntries;
+        }
+
+        for (unsigned int j = 0; j < FS_DIRENTRIES; j++) {
+
+            if (direntries_read[j].inode_block == 0 && empty_direntry == -1) {
+                direntry_block = cur_inode.blocks[i];
+                empty_direntry = j;
+                
+                std::cerr << "adding to directory:                                 index: " << empty_direntry << "  block: " << direntry_block << "\n";
+                for(unsigned int k = 0; k < FS_DIRENTRIES; ++k) {
+                    if(direntries_read[k].inode_block != 0) {
+                        std::cerr << "                                     --" << std::string(direntries_read[k].name) << "\n";
+                    }  
+                    else {
+                        std::cerr << "                                     --\n";
+                    }
+                }
+            }
+
+            if (direntries_read[j].inode_block != 0 && std::string(direntries_read[j].name) == pathname.substr(indices[level-1]+1)){
+                cout_lock.lock();
+                std::cout << "522 write unlock on: " << cur_inode_block << std::endl;   
+                cout_lock.unlock();                       
+                mutex_map[cur_inode_block].unlock();
+
+                used_blocks_lock.lock();
+                used_blocks[new_inode_block] = false;
+                used_blocks_lock.unlock();
+                mutex_map[new_inode_block].unlock();
+
+                cout_lock.lock();
+                std::cerr << pathname.substr(indices[level-1]+1) + " already exists.\n";
+                cout_lock.unlock();
+
+                return -1;
+            }
+        }
+    }
+
+
+    fs_inode new_inode;
+    strcpy(new_inode.owner, username);
+    new_inode.size = 0;
+    if (*tokens[4] == 'f') {
+        new_inode.type = 'f';   
+    }
+    else if (*tokens[4] == 'd') {
+        new_inode.type = 'd';   
+    }
+    // else {
+    //     std::cout << "313 write unlock on: " << cur_inode_block << std::endl;  
+    //     mutex_map[cur_inode_block].unlock();
+        
+    //     return -1;
+    // }
+
+
+    fs_direntry new_entries[FS_DIRENTRIES];
+    if (empty_direntry == -1) {
+        if(cur_inode.size == FS_MAXFILEBLOCKS) {
+            cout_lock.lock();
+            std::cout << "559 write unlock on: " << cur_inode_block << std::endl;  
+            cout_lock.unlock();
+            mutex_map[cur_inode_block].unlock();
+
+            
+            used_blocks_lock.lock();
+            used_blocks[new_inode_block] = false;
+            used_blocks_lock.unlock();
+            mutex_map[new_inode_block].unlock();
+            return -1;
+        }
+        
+        direntry_block = get_empty_block();
+        if (direntry_block == -1) {
+            cout_lock.lock();
+            std::cout << "574 write unlock on: " << cur_inode_block << std::endl; 
+            cout_lock.unlock();             
+            mutex_map[cur_inode_block].unlock();
+
+            used_blocks_lock.lock();
+            used_blocks[new_inode_block] = false;
+            used_blocks_lock.unlock();
+
+            mutex_map[new_inode_block].unlock();
+
+            return -1;
+        }            
+
+        strcpy(new_entries[0].name, pathname.substr(indices[indices.size() - 1] + 1).c_str()); 
+
+        new_entries[0].inode_block = new_inode_block;
+        
+        for(unsigned int i = 1; i < FS_DIRENTRIES; ++i) {
+            new_entries[i].inode_block = 0;
+        }
+        cur_inode.blocks[cur_inode.size] = direntry_block;
+        cur_inode.size++;
+
+        cout_lock.lock();
+        std::cerr << "new directory:\n";
+        for(unsigned int j = 0; j < FS_DIRENTRIES; ++j) {
+            if(new_entries[j].inode_block != 0)
+                std::cerr << "                                     " << std::string(new_entries[j].name) << "\n";
+        }
+        cout_lock.unlock();
+
+    }
+    else {
+
+        direntries[empty_direntry].inode_block = new_inode_block;
+        strcpy(direntries[empty_direntry].name, pathname.substr(indices[indices.size() - 1] + 1).c_str());
+
+        cout_lock.lock();
+        std::cerr << "*adding to directory:                                index: " << empty_direntry << "  block: " << direntry_block << "\n";
+        for(unsigned int k = 0; k < FS_DIRENTRIES; ++k) {
+            if(direntries[k].inode_block != 0) {
+                std::cerr << "                                     --" << std::string(direntries[k].name) << "\n";
+            }  
+            else {
+                std::cerr << "                                     --\n";
+            }
+        }
+        cout_lock.unlock();
+
+    }
+
+    cout_lock.lock();
+    std::cerr << "disk write to: " << new_inode_block << "\n";
+    cout_lock.unlock();
+
+    disk_writeblock(new_inode_block, (void*)&new_inode);
+    if (empty_direntry == -1) {
+        cout_lock.lock();
+        std::cerr << "disk write to: " << direntry_block << "\n";
+        cout_lock.unlock();
+        disk_writeblock(direntry_block, (void*)&new_entries);
+        cout_lock.lock();
+        std::cerr << "disk write to: " << cur_inode_block << "\n";
+        cout_lock.unlock();
+        disk_writeblock(cur_inode_block, (void*)&cur_inode);
+    }
+    else {
+        cout_lock.lock();
+        std::cerr << "disk write to: " << direntry_block << "\n";
+        cout_lock.unlock();
+        disk_writeblock(direntry_block, (void*)&direntries);
+    }
+
+    cout_lock.lock();
+    std::cout << "614 write unlock on: " << new_inode_block << std::endl;
+    cout_lock.unlock();
+    mutex_map[new_inode_block].unlock();
+    cout_lock.lock();
+    std::cout << "618 write unlock on: " << cur_inode_block << std::endl;
+    cout_lock.unlock();
+    mutex_map[cur_inode_block].unlock();
+
+    cout_lock.lock();
+    std::cerr << "\n";
+    cout_lock.unlock();
+
+    return_msg = (char*) malloc(strlen(tokens[1]) + strlen(tokens[2]) + 2);
+    strcpy(return_msg, tokens[1]);
+    return_msg[strlen(tokens[1])] = ' ';
+    strcpy(return_msg + strlen(tokens[1]) + 1, tokens[2]);
+    return_msg[strlen(tokens[1]) + 1 + strlen(tokens[2])] = '\0';
+    return strlen(tokens[1]) + 2 + strlen(tokens[2]);
+}
+
+
+int delete_handler(char* username, char* message, char* &return_msg) {
+    char* tokens[4];
+    //printf("messge: %s\n", message);
+
+    //printf("token1: %s\n", tokens[1]);
+    //printf("token2: %s\n", tokens[2]);
+    if (!tokenize_message(message, tokens, 4)) return -1;
+
+    if (!session_checker(username, tokens[1], tokens[2])) return -1;    
+
+    size_t t1, t2;
+    unsigned int session = (unsigned int)std::stoul(tokens[1], &t1, 10);
+    unsigned int sequence = (unsigned int)std::stoul(tokens[2], &t2, 10);
+    if (tokens[1][t1] != '\0' || tokens[2][t2] != '\0' ) {
+        return -1;
+    }
+
+    std::string pathname = tokens[3];
+    if (pathname.length() > FS_MAXPATHNAME) return -1;
+
+    session_lock.lock();
+    session_map[session].second = sequence;
+    session_lock.unlock();
+
+    if (!is_pathname_valid(pathname)) return -1;
+
+
+    std::vector<int> indices;
+    file_splitter(pathname, indices);
+    bool err = false;
+    if("file940" == pathname.substr(indices[1]+1)) {
+        err = true;
+    }
+
+    err = false;
+
+
+    fs_inode cur_inode;
+    int cur_inode_block = 0;
+    if (indices.size() == 1) {
+        cout_lock.lock();
+        std::cout << "658 write lock on: " << cur_inode_block << "\n";
+        if(err) {
+            std::cerr << "658 write lock on: " << cur_inode_block << "\n";
+        }
+        cout_lock.unlock();
+
+        mutex_map[cur_inode_block].lock();
+        // cout_lock.lock();
+        // std::cout << "658 done  " << cur_inode_block << "\n";
+        // cout_lock.unlock();
+    }
+    else {
+        cout_lock.lock();
+        std::cout << "664 read lock on: " << cur_inode_block << "\n";
+        if(err) {
+            std::cerr << "664 read lock on: " << cur_inode_block << "\n";
+        }
+        cout_lock.unlock();
+
+        mutex_map[cur_inode_block].lock_shared();
+        // cout_lock.lock();
+        // std::cout << "664 done " << cur_inode_block << "\n";
+        // cout_lock.unlock();
+
+    }
+    disk_readblock(cur_inode_block, (void*)&cur_inode);
+    unsigned int level = 1;
+    while (level < indices.size()) {
+        bool found = false;
+        
+        for (unsigned int i = 0; i < cur_inode.size; ++i) {
+            fs_direntry direntries[FS_DIRENTRIES];
+            disk_readblock(cur_inode.blocks[i], (void*)&direntries);
+
+
+            for (unsigned int j = 0; j < FS_DIRENTRIES; j++) {
+                cout_lock.lock();
+                std::cout << pathname.substr(indices[level -1 ] + 1, indices[level]-(indices[level - 1] + 1)) << "\n";
+                cout_lock.unlock();
+                if (direntries[j].inode_block != 0 && std::string(direntries[j].name) == pathname.substr(indices[level - 1] + 1, indices[level] - (indices[level - 1] + 1))) {
+                    if(level == indices.size() - 1) {
+                        cout_lock.lock();
+                        std::cout << "684 write lock on: " << direntries[j].inode_block << std::endl;
+                        if(err) {
+                            std::cerr << "684 write lock on: " << direntries[j].inode_block << std::endl;
+                        }
+                        cout_lock.unlock();                        
+                        mutex_map[direntries[j].inode_block].lock();
+                        // cout_lock.lock();
+                        // std::cout << " 684 acquired.\n ";
+                        // cout_lock.unlock();       
+                    }
+                    else {
+                        cout_lock.lock();
+                        std::cout << "787 read lock on: " << direntries[j].inode_block << std::endl;
+                        if(err) {
+                            std::cerr << "787 read lock on: " << direntries[j].inode_block << std::endl;
+                        }
+                        cout_lock.unlock();                        
+                        mutex_map[direntries[j].inode_block].lock_shared();
+                        // cout_lock.lock();
+                        // std::cout << "787 acquired " << direntries[j].inode_block << std::endl;
+                        // cout_lock.unlock();  
+                    }
+
+               
+                    
+                    disk_readblock(direntries[j].inode_block, (void*)&cur_inode);
+                    cout_lock.lock();
+                    std::cout << "700 read unlock on: " << cur_inode_block << std::endl;
+                    if(err) {
+                        std::cerr << "700 read unlock on: " << cur_inode_block << std::endl;
+                    }
+                    cout_lock.unlock();
+                    mutex_map[cur_inode_block].unlock_shared();
+                    // cout_lock.lock();
+                    // std::cout << "700 done " << cur_inode_block << std::endl; 
+                    // cout_lock.unlock();
+
+                    cur_inode_block = direntries[j].inode_block;
+
+                     if(strcmp(cur_inode.owner, username) != 0 || cur_inode.type == 'f') {
+                        if(level == indices.size() - 1) {
+                            cout_lock.lock();
+                            std::cout << "708 write unlock on: " << cur_inode_block << std::endl;
+                            if(err) {
+                                std::cerr << "708 write unlock on: " << cur_inode_block << std::endl;
+                            }       
+                            cout_lock.unlock();
+                            mutex_map[cur_inode_block].unlock();
+                        }
+                        else {
+                            cout_lock.lock();
+                            std::cout << "816 read unlock on: " << cur_inode_block << std::endl;
+                            if(err) {
+                                std::cerr << "816 read unlock on: " << cur_inode_block << std::endl;
+                            }    
+                            cout_lock.unlock();
+                            mutex_map[cur_inode_block].unlock_shared();
+                        }
+                        return -1;
+                    }
+
+                    ++level;
+                    found = true;
+                    break;
+                }
+            }
+            if (found) break;
+
+        }
+        if (!found) {
+            cout_lock.lock();                        
+            std::cout << "731 read unlock on: " << cur_inode_block << std::endl;
+            if(err) {
+                std::cerr << "731 read unlock on: " << cur_inode_block << std::endl;
+            }  
+            cout_lock.unlock();
+            mutex_map[cur_inode_block].unlock_shared();
+            
+
+            return -1;
+        }
+    }
+    
+    cout_lock.lock();
+    std::cerr << "\n--Deleting: " << pathname.substr(indices[level-1]+1) << "\n";
+    cout_lock.unlock();
+
+    fs_direntry direntries[FS_DIRENTRIES];
+    
+    bool all_empty = true;
+    
+    int direntry_index = -1;
+    int direntry_block = -1;
+
+
+    for (unsigned int i = 0; i < cur_inode.size; ++i) {
+        all_empty = true;
+
+        disk_readblock(cur_inode.blocks[i], (void*)&direntries);
+
+        for (unsigned int j = 0; j < FS_DIRENTRIES; j++) {
+            
+            if (direntries[j].inode_block != 0 && std::string(direntries[j].name) == pathname.substr(indices[level-1]+1)){
+                direntry_index = j;
+                direntry_block = i;
+            }
+            else if (direntries[j].inode_block != 0) {
+
+                all_empty = false;
+            }
+        }
+
+        if(direntry_index != -1) {
+            std::cerr << "removing from directory:                            index: " << direntry_index << "  block: " << cur_inode.blocks[direntry_block] << "\n";
+            for(unsigned int k = 0; k < FS_DIRENTRIES; ++k) {
+                if(direntries[k].inode_block != 0) {
+                    std::cerr << "                                     --" << std::string(direntries[k].name) << "\n";
+                }  
+                else {
+                    std::cerr << "                                     --\n";
+                }
+            }
+
+            break;
+        }
+      
+    }
+
+    if (direntry_index == -1 || direntry_block == -1) {
+        cout_lock.lock();
+        std::cerr << pathname.substr(indices[level-1]+1) << "  count: " << 0 << "\n";
+
+        std::cout << "821 write unlock on: " << cur_inode_block << std::endl;
+        if(err) {
+            std::cerr << "821 write unlock on: " << cur_inode_block << std::endl;
+        }  
+        cout_lock.unlock();
+        mutex_map[cur_inode_block].unlock();
+        return -1;
+    }
+
+    fs_inode delete_inode;
+    cout_lock.lock();
+    std::cout << "771 write lock on: " << direntries[direntry_index].inode_block << std::endl;
+    if(err) {
+        std::cerr << "771 write lock on: " << direntries[direntry_index].inode_block << std::endl;
+    }  
+    cout_lock.unlock();
+    mutex_map[direntries[direntry_index].inode_block].lock();
+    disk_readblock(direntries[direntry_index].inode_block, (void*)&delete_inode);
+
+    if (strcmp(delete_inode.owner,username) != 0 || (delete_inode.size > 0 && delete_inode.type == 'd')) {
+
+        mutex_map[cur_inode_block].unlock();
+        mutex_map[direntries[direntry_index].inode_block].unlock();
+        cout_lock.lock();
+        printf("Deleting non-empty directory\n");
+        cout_lock.unlock();
+        return -1;
+    }
+
+
+    if (delete_inode.type == 'f') {
+        used_blocks_lock.lock();
+        for (unsigned int i = 0; i < delete_inode.size; ++i) {
+            used_blocks[delete_inode.blocks[i]] = false;
+        }
+        used_blocks_lock.unlock();
+
+    }
+    int delete_inode_block = direntries[direntry_index].inode_block;
+    
+    if (!all_empty) {
+        direntries[direntry_index].inode_block = 0;
+
+        std::cerr << "*removing from directory:                          index: " << direntry_index << "  block: " << cur_inode.blocks[direntry_block] << "\n";
+        for(unsigned int k = 0; k < FS_DIRENTRIES; ++k) {
+            if(direntries[k].inode_block != 0) {
+                std::cerr << "                                     --" << std::string(direntries[k].name) << "\n";
+            }  
+            else {
+                std::cerr << "                                     --\n";
+            }
+        }
+        
+
+        cout_lock.lock();
+            std::cerr << "disk write to: " << cur_inode.blocks[direntry_block] << std::endl;
+        cout_lock.unlock();
+        disk_writeblock(cur_inode.blocks[direntry_block], (void*)&direntries);
+    }
+
+    used_blocks_lock.lock();
+    used_blocks[delete_inode_block] = false;
+    used_blocks_lock.unlock();
+       
+    if(all_empty) {
+        used_blocks_lock.lock();
+        used_blocks[cur_inode.blocks[direntry_block]] = false;
+        used_blocks_lock.unlock();
+
+        std::cerr << "*removing from directory:                                 index: " << direntry_index << "  block: " << cur_inode.blocks[direntry_block] << "\n";
+
+        for (unsigned int i = direntry_block; i < cur_inode.size-1; ++i) {
+            cur_inode.blocks[i] = cur_inode.blocks[i+1];
+        }
+
+        --cur_inode.size;
+        cout_lock.lock();
+
+        std::cerr << "disk write to: " << cur_inode_block << std::endl;
+        
+        cout_lock.unlock();
+        disk_writeblock(cur_inode_block, (void*)&cur_inode);
+    }
+        
+    
+    cout_lock.lock();
+    std::cout << "819 write unlock on: " << delete_inode_block << std::endl;
+    if(err) {
+        std::cerr << "819 write unlock on: " << delete_inode_block << std::endl;
+    }  
+    cout_lock.unlock();
+    mutex_map[delete_inode_block].unlock();
+    // cout_lock.lock();
+    // std::cout << "823 write unlock on: " << cur_inode_block << std::endl;
+    // cout_lock.unlock();
+    mutex_map[cur_inode_block].unlock();
+    return_msg = (char*) malloc(strlen(tokens[1]) + strlen(tokens[2]) + 2);
+    strcpy(return_msg, tokens[1]);
+    return_msg[strlen(tokens[1])] = ' ';
+    strcpy(return_msg + strlen(tokens[1]) + 1, tokens[2]);
+    return_msg[strlen(tokens[1]) + 1 + strlen(tokens[2])] = '\0';
+    return strlen(tokens[1]) + 2 + strlen(tokens[2]);
+
+}
+
+bool session_checker(char* username, char* session_char, char* sequence_char){
+    bool return_val = false;
+
+    unsigned int session, sequence;
+    unsigned long temp1, temp2;
+
+    try
+    {
+        size_t t1, t2;
+        temp1 = std::stoul(session_char, &t1, 10);
+        temp2 = std::stoul(sequence_char, &t2, 10);
+        if (session_char[t1] != '\0' || sequence_char[t2] != '\0') {
+			
+        	return false;
+		}
+    }
+    catch(...)
+    {
+        return false;
+    }
+    if(temp1 > UINT_MAX || temp2 > UINT_MAX) return false;
+
+    session = (unsigned int)temp1;
+    sequence = (unsigned int)temp2;
+
+    session_lock.lock();
+    auto it = session_map.find(session);
+    if(it != session_map.end() && it->second.first == std::string(username) && sequence > it->second.second) {
+        return_val = true;
+    }
+    
+
+    session_lock.unlock();
+
+    return return_val;
+}
+
+void file_splitter(std::string path, std::vector<int> &vec) {
+    size_t pos = path.find('/');
+ 
+    // Repeat till end is reached
+    while( pos != std::string::npos) {
+        // Add position to the vector
+        vec.push_back(pos);
+
+        // Get the next occurrence from the current position
+        pos = path.find('/', pos + 1);
+    }
+    // vec.push_back(path.length());
+}
+
+int get_empty_block() {
+    unsigned int block = 1;
+    used_blocks_lock.lock();
+    while (block < FS_DISKSIZE && used_blocks[block]) ++block;
+
+    if (block == FS_DISKSIZE) {
+        used_blocks_lock.unlock();
+        return -1;
+    }
+    
+    used_blocks[block] = true;
+
+    used_blocks_lock.unlock();
+
+    return block;
+}
+
+bool is_pathname_valid(std::string pathname) {
+    
+    if (pathname == "" || pathname.at(0) != '/' || pathname.at(pathname.length() - 1) == '/' || pathname.find(' ') != std::string::npos) 
+        return false;
+    
+    return true;
+}
